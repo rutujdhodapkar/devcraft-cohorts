@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    match /applications/{applicationId} {
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.paymentStatus == 'unpaid'
+        && request.resource.data.applicationStatus == 'submitted'
+        && request.resource.data.fee is int
+        && request.resource.data.keys().hasOnly(['uid','email','fullName','dob','college','degree','year','phone','cohortId','cohortTitle','why','paymentStatus','applicationStatus','fee','createdAt']);
+      allow read: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      // Clients may not update payment status, fee, uid, or application status.
+      allow update, delete: if isAdmin();
+    }
+    match /analyticsEvents/{eventId} { allow read, write: if isAdmin(); }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
